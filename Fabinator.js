@@ -796,11 +796,6 @@
             toggleButton.querySelector('svg').style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
         });
 
-        document.getElementById('qal-minimize-btn').addEventListener('click', () => {
-            gui.style.top = '-700px';
-            toggleButton.querySelector('svg').style.transform = 'rotate(0deg)';
-        });
-
         document.getElementById('qal-personal-alternative').addEventListener('change', (e) => {
             state.personalLicenseAlternatively = e.target.checked;
             log(`Personal license alternative: ${e.target.checked ? 'Enabled' : 'Disabled'}`, 'info');
