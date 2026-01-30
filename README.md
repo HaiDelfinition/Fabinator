@@ -49,7 +49,6 @@ Fabinator is an automated script designed to streamline the process of licensing
 
 5. **Control the Process**:
    - **Pause**: Temporarily halt processing (can be resumed)
-   - **Stop**: Completely stop the automation
    - **Reset**: Clear all counters and start fresh
 
 ### GUI Elements
@@ -63,7 +62,6 @@ Fabinator is an automated script designed to streamline the process of licensing
 #### Control Buttons
 - **Start**: Begin automated processing
 - **Pause/Resume**: Toggle pause state during processing
-- **Stop**: Halt processing completely
 - **Reset**: Clear all statistics counters
 
 #### Activity Log
