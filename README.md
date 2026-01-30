@@ -17,7 +17,7 @@ Fabinator is an automated script designed to streamline the process of licensing
 ## Installation
 
 1. **Install a Userscript Manager**:
-   - For Chrome/Edge: [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
+   - For Chrome/Edge: [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) Not working at the moment!
    - For Firefox: [Tampermonkey](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/) or [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/) or [Code Injector](https://addons.mozilla.org/en-US/firefox/addon/codeinjector/)
    - For Safari: [Tampermonkey](https://apps.apple.com/us/app/tampermonkey/id1482490089)
 
