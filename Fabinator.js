@@ -17,10 +17,10 @@
     priceTextClass:
       "fabkit-Typography-root.fabkit-Typography--align-start.fabkit-Typography--intent-primary.fabkit-Text--lg.fabkit-Text--bold",
     modalStackSelector: ".fabkit-Stack-root.nTa5u2sc",
-    highlightColor: "#d542b2",
-    guiBackgroundColor: "#220a29",
-    guiAccentColor: "#af3d7e",
-    processingDelay: 500,
+    highlightColor: "#764ba2",
+    guiBackgroundColor: "#667eea",
+    guiAccentColor: "#764ba2",
+    processingDelay: 1500,
     modalOpenDelay: 800,
     scrollDelay: 300,
   };
@@ -240,18 +240,6 @@
       await waitForElement(".fabkit-Modal-root", 3000);
       log("Modal appeared", "success");
 
-      // Wait for modal elements to be fully loaded
-      log("Waiting for radio buttons and close button to load...", "info");
-      await Promise.all([
-        waitForElement(`#${config.professionalRadioId}`, 5000).catch(() => null),
-        waitForElement(`#${config.personalRadioId}`, 5000).catch(() => null),
-        waitForElement(config.modalCloseButtonSelector, 5000).catch(() => null),
-      ]);
-      
-      // Additional delay to ensure elements are interactive
-      await waitFor(500);
-      log("Modal elements fully loaded", "success");
-
       const modal = document.querySelector(".fabkit-Modal-root");
 
       if (!modal) {
@@ -259,17 +247,22 @@
         return false;
       }
 
-      const formFields = modal.querySelectorAll(".fabkit-FormField-root");
+      await waitFor(config.modalOpenDelay);
 
-      /*if (formFields.length < 2) {
-            log("License options not found", "error");
-            await closeModalIfOpen();
-            return false;
-            }*/
+      // Find all form fields
+      const formFields = modal.querySelectorAll(".fabkit-FormField-root");
+      log(`Found ${formFields.length} license sections`, "info");
+
+      if (formFields.length < 2) {
+        log("Not enough license options found", "error");
+        await closeModalIfOpen();
+        return false;
+      }
 
       let professionalSection = null;
       let personalSection = null;
 
+      // Identify Professional and Personal sections
       formFields.forEach((field) => {
         const label = field.querySelector("label");
         if (label && label.textContent.trim() === "Professional") {
@@ -312,7 +305,7 @@
         personalIsFree ? "success" : "warning",
       );
 
-      // Decision Logic (from working script)
+      // Decision logic
       if (professionalIsFree) {
         log("Selecting Professional license", "info");
         const professionalRadio = professionalSection.querySelector(
@@ -322,10 +315,7 @@
           professionalRadio.click();
           await waitFor(300);
 
-          // Wait for confirm button to be available and enabled
-          log("Waiting for Add button to be ready...", "info");
-          const addButton = await waitForElement(config.confirmButtonSelector, 3000).catch(() => null);
-          
+          const addButton = modal.querySelector(config.confirmButtonSelector);
           if (addButton && !addButton.disabled) {
             addButton.click();
             log("Added to library (Professional)", "success");
@@ -333,8 +323,6 @@
             updateCounters();
             await waitFor(1000);
             return true;
-          } else {
-            log("Add button not found or disabled", "error");
           }
         }
         log("Error adding to library", "error");
@@ -353,10 +341,7 @@
           personalRadio.click();
           await waitFor(300);
 
-          // Wait for confirm button to be available and enabled
-          log("Waiting for Add button to be ready...", "info");
-          const addButton = await waitForElement(config.confirmButtonSelector, 3000).catch(() => null);
-          
+          const addButton = modal.querySelector(config.confirmButtonSelector);
           if (addButton && !addButton.disabled) {
             addButton.click();
             log("Added to library (Personal)", "success");
@@ -364,8 +349,6 @@
             updateCounters();
             await waitFor(1000);
             return true;
-          } else {
-            log("Add button not found or disabled", "error");
           }
         }
         log("Error adding to library", "error");
@@ -384,24 +367,11 @@
   }
 
   async function closeModalIfOpen() {
-    try {
-      log("Attempting to close modal...", "info");
-      // Wait for close button to be available
-      const closeButton = await waitForElement(
-        config.modalCloseButtonSelector,
-        3000
-      ).catch(() => null);
-      
-      if (closeButton) {
-        log("Close button found, clicking...", "info");
-        closeButton.click();
-        await waitFor(500);
-        log("Modal closed", "success");
-      } else {
-        log("No close button found - modal may already be closed", "info");
-      }
-    } catch (error) {
-      log(`Error closing modal: ${error.message}`, "warn");
+    const closeButton = document.querySelector(config.modalCloseButtonSelector);
+    if (closeButton) {
+      log("Closing modal...", "info");
+      closeButton.click();
+      await waitFor(500);
     }
   }
 
@@ -412,7 +382,7 @@
 
       // Highlight the item
       highlightItem(item, true);
-      await waitFor(200);
+      await waitFor(500);
 
       // Check if item is free
       if (!checkIfItemIsFree(item)) {
@@ -425,6 +395,7 @@
 
       // Find and click shopping cart button
       const cartButton = findShoppingCartButton(item);
+
       if (!cartButton) {
         log(
           `Item ${index + 1}: Shopping cart button not found - skipping`,
@@ -531,20 +502,18 @@
           "info",
         );
       }
+
+      log("\n" + "=".repeat(50), "info");
+      log("Processing completed!", "success");
+      log(`Professional licenses: ${state.counters.professional}`, "info");
+      log(`Personal licenses: ${state.counters.personal}`, "info");
+      log(`Skipped items: ${state.counters.skipped}`, "info");
+      log(`Total processed: ${state.counters.total}`, "info");
     } catch (error) {
       log(`Fatal error in processing loop: ${error.message}`, "error");
     } finally {
       state.isRunning = false;
       log("Processing stopped", "info");
-      updateStartButton();
-    }
-  }
-
-  function stopProcessing() {
-    if (state.isRunning) {
-      log("Stopping process...", "info");
-      state.isRunning = false;
-      state.isPaused = false;
       updateStartButton();
     }
   }
@@ -576,177 +545,178 @@
   // ===================
 
   function createGUI() {
-    // Remove existing GUI if any
-    const existingGUI = document.getElementById("quixel-auto-license-gui");
-    if (existingGUI) {
-      existingGUI.remove();
-    }
-
-    // Create minimized toggle button
+    // Create toggle button
     const toggleButton = document.createElement("div");
-    toggleButton.id = "quixel-auto-license-toggle";
+    toggleButton.id = "qal-toggle-button";
     toggleButton.innerHTML = `
-            <svg width="33" height="33" viewBox="0 0 24 24" fill="white">
-                <path d="M7 10l5 5 5-5z"/>
-            </svg>
-        `;
-    toggleButton.style.cssText = `
-            position: fixed;
-            top: 0;
-            right: 300px;
-            width: 40px;
-            height: 35px;
-            background: ${config.guiBackgroundColor};
-            border: 2px solid ${config.guiAccentColor};
-            border-top: none;
-            border-bottom-left-radius: 8px;
-            border-bottom-right-radius: 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(255, 0, 128, 0.3);
+            <button style="
+                position: fixed;
+                top: -10px;
+                right: 260px;
+                width: 50px;
+                height: 50px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border: none;
+                border-radius: 50%;
+                cursor: pointer;
+                z-index: 999998;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.3s ease;
+            " onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 6px 20px rgba(102, 126, 234, 0.6)'"
+               onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 15px rgba(102, 126, 234, 0.4)'">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="transition: transform 0.3s ease;">
+                    <path d="M7 10L12 15L17 10" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
         `;
 
-    // Create main GUI container
+    // Create main GUI panel
     const gui = document.createElement("div");
-    gui.id = "quixel-auto-license-gui";
-    gui.style.cssText = `
-            position: fixed;
-            top: -600px;
-            right: 20px;
-            width: 400px;
-            background: ${config.guiBackgroundColor};
-            border: 2px solid ${config.guiAccentColor};
-            border-radius: 12px;
-            padding: 20px;
-            z-index: 10001;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            box-shadow: 0 8px 32px rgba(241, 43, 115, 0.4);
-            transition: top 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        `;
-
+    gui.id = "qal-gui";
     gui.innerHTML = `
             <style>
-                #quixel-auto-license-gui * {
-                    box-sizing: border-box;
+                #qal-gui {
+                    position: fixed;
+                    top: -830px;
+                    right: 20px;
+                    width: 380px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border-radius: 16px;
+                    padding: 24px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                    z-index: 999999;
+                    transition: top 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    backdrop-filter: blur(10px);
                 }
                 .qal-title {
-                    color: ${config.guiAccentColor};
-                    font-size: 22px;
-                    font-weight: bold;
                     margin: 0 0 20px 0;
+                    font-size: 22px;
+                    font-weight: 700;
                     text-align: center;
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
                 }
                 .qal-section {
-                    margin-bottom: 20px;
+                    background: rgba(255, 255, 255, 0.15);
+                    border-radius: 12px;
+                    padding: 16px;
+                    margin-bottom: 16px;
+                    backdrop-filter: blur(10px);
+                }
+                .qal-section-end {
+                    background: rgba(255, 255, 255, 0.15);
+                    border-radius: 12px;
+                    padding: 16px;
+                    backdrop-filter: blur(10px);
                 }
                 .qal-section-title {
-                    color: ${config.guiAccentColor};
                     font-size: 14px;
-                    font-weight: bold;
-                    margin-bottom: 10px;
+                    font-weight: 600;
+                    margin-bottom: 12px;
+                    opacity: 0.95;
                     text-transform: uppercase;
                     letter-spacing: 0.5px;
                 }
                 .qal-checkbox-container {
                     display: flex;
                     align-items: center;
-                    margin-bottom: 15px;
-                    padding: 12px;
-                    background: rgba(114, 25, 89, 0.1);
-                    border-radius: 6px;
-                    border: 1px solid rgba(137, 23, 69, 0.3);
+                    gap: 10px;
                 }
                 .qal-checkbox {
                     width: 20px;
                     height: 20px;
-                    margin-right: 12px;
                     cursor: pointer;
-                    accent-color: ${config.guiAccentColor};
+                    accent-color: white;
                 }
                 .qal-checkbox-label {
-                    color: #ffffff;
+                    cursor: pointer;
                     font-size: 14px;
+                    user-select: none;
                     flex: 1;
                 }
                 .qal-counters {
                     display: grid;
                     grid-template-columns: 1fr 1fr;
-                    gap: 10px;
-                    margin-bottom: 20px;
+                    gap: 12px;
                 }
                 .qal-counter {
-                    background: rgba(255, 0, 140, 0.15);
+                    background: rgba(0, 0, 0, 0.2);
                     padding: 12px;
-                    border-radius: 6px;
-                    border: 1px solid rgba(255, 0, 106, 0.3);
+                    border-radius: 8px;
+                    text-align: center;
                 }
                 .qal-counter-label {
-                    color: #aaa;
                     font-size: 11px;
+                    opacity: 0.9;
+                    margin-bottom: 6px;
                     text-transform: uppercase;
                     letter-spacing: 0.5px;
-                    margin-bottom: 5px;
                 }
                 .qal-counter-value {
-                    color: ${config.guiAccentColor};
                     font-size: 24px;
-                    font-weight: bold;
+                    font-weight: 700;
+                    color: white;
                 }
                 .qal-buttons {
-                    display: flex;
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
                     gap: 10px;
-                    margin-bottom: 20px;
                 }
                 .qal-button {
-                    flex: 1;
-                    padding: 12px;
-                    background: ${config.guiAccentColor};
-                    color: ${config.guiBackgroundColor};
+                    padding: 14px 20px;
+                    background: white;
+                    color: #667eea;
                     border: none;
-                    border-radius: 6px;
+                    border-radius: 10px;
                     font-size: 14px;
-                    font-weight: bold;
+                    font-weight: 700;
                     cursor: pointer;
-                    transition: all 0.2s;
+                    transition: all 0.2s ease;
                     text-transform: uppercase;
                     letter-spacing: 0.5px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
                 }
                 .qal-button:hover {
-                    background: #b92d7c;
                     transform: translateY(-2px);
-                    box-shadow: 0 4px 12px rgba(109, 25, 41, 0.4);
+                    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
                 }
                 .qal-button:active {
                     transform: translateY(0);
                 }
                 .qal-button.stop {
-                    background: #ff4444;
+                    background: rgba(255, 255, 255, 0.2);
+                    color: white;
+                    border: 2px solid white;
                 }
                 .qal-button.stop:hover {
-                    background: #cc0000;
+                    background: rgba(255, 255, 255, 0.3);
                 }
                 .qal-button.pause {
-                    background: #ff9800;
+                    background: rgba(255, 255, 255, 0.2);
+                    color: white;
+                    border: 2px solid white;
                 }
                 .qal-button.pause:hover {
-                    background: #e68900;
+                    background: rgba(255, 255, 255, 0.3);
                 }
                 .qal-button.reset {
-                    background: #666;
+                    background: rgba(255, 255, 255, 0.2);
+                    color: white;
+                    border: 2px solid white;
                 }
                 .qal-button.reset:hover {
-                    background: #555;
+                    background: rgba(255, 255, 255, 0.3);
                 }
                 .qal-logs {
-                    background: rgba(0, 0, 0, 0.5);
-                    border: 1px solid rgba(0, 217, 255, 0.3);
-                    border-radius: 6px;
+                    background: rgba(0, 0, 0, 0.3);
+                    border-radius: 8px;
                     padding: 12px;
                     max-height: 200px;
                     overflow-y: auto;
@@ -754,45 +724,35 @@
                     font-size: 11px;
                 }
                 .qal-log-entry {
-                    color: #ccc;
+                    color: rgba(255, 255, 255, 0.9);
                     margin-bottom: 4px;
-                    line-height: 1.4;
+                    line-height: 1.5;
                 }
                 .qal-log-entry.error {
-                    color: #ff6b6b;
+                    color: #ffcdd2;
                 }
                 .qal-log-entry.warn {
-                    color: #ffd93d;
+                    color: #fff9c4;
                 }
                 .qal-log-entry.info {
-                    color: #6bcf7f;
+                    color: #b2dfdb;
+                }
+                .qal-log-entry.success {
+                    color: #c8e6c9;
                 }
                 .qal-logs::-webkit-scrollbar {
                     width: 8px;
                 }
                 .qal-logs::-webkit-scrollbar-track {
-                    background: rgba(0, 0, 0, 0.3);
+                    background: rgba(0, 0, 0, 0.2);
                     border-radius: 4px;
                 }
                 .qal-logs::-webkit-scrollbar-thumb {
-                    background: ${config.guiAccentColor};
+                    background: rgba(255, 255, 255, 0.3);
                     border-radius: 4px;
                 }
-                .qal-minimize {
-                    position: absolute;
-                    top: 10px;
-                    right: 10px;
-                    background: transparent;
-                    border: none;
-                    color: ${config.guiAccentColor};
-                    font-size: 24px;
-                    cursor: pointer;
-                    line-height: 1;
-                    padding: 5px;
-                    transition: transform 0.2s;
-                }
-                .qal-minimize:hover {
-                    transform: scale(1.2);
+                .qal-logs::-webkit-scrollbar-thumb:hover {
+                    background: rgba(255, 255, 255, 0.5);
                 }
             </style>
 
@@ -831,14 +791,13 @@
 
             <div class="qal-section">
                 <div class="qal-buttons">
-                    <button class="qal-button" id="qal-start-btn">Start</button>
-                    <button class="qal-button pause" id="qal-pause-btn" style="display: none;">Pause</button>
-                    <button class="qal-button stop" id="qal-stop-btn" style="display: none;">Stop</button>
-                    <button class="qal-button reset" id="qal-reset-btn">Reset</button>
+                    <button class="qal-button" id="qal-start-btn">▶️ Start</button>
+                    <button class="qal-button pause" id="qal-pause-btn" style="display: none;">⏸️ Pause</button>
+                    <button class="qal-button reset" id="qal-reset-btn">🔄 Reset</button>
                 </div>
             </div>
 
-            <div class="qal-section">
+            <div class="qal-section-end">
                 <div class="qal-section-title">Activity Log</div>
                 <div class="qal-logs" id="qal-logs"></div>
             </div>
@@ -848,9 +807,9 @@
     document.body.appendChild(gui);
 
     // Event Listeners
-    toggleButton.addEventListener("click", () => {
+    toggleButton.querySelector("button").addEventListener("click", () => {
       const isVisible = gui.style.top === "30px";
-      gui.style.top = isVisible ? "-700px" : "30px";
+      gui.style.top = isVisible ? "-830px" : "30px";
       toggleButton.querySelector("svg").style.transform = isVisible
         ? "rotate(0deg)"
         : "rotate(180deg)";
@@ -869,9 +828,6 @@
     document
       .getElementById("qal-start-btn")
       .addEventListener("click", processAllItems);
-    document
-      .getElementById("qal-stop-btn")
-      .addEventListener("click", stopProcessing);
     document
       .getElementById("qal-pause-btn")
       .addEventListener("click", togglePause);
@@ -895,17 +851,14 @@
 
   function updateStartButton() {
     const startBtn = document.getElementById("qal-start-btn");
-    const stopBtn = document.getElementById("qal-stop-btn");
     const pauseBtn = document.getElementById("qal-pause-btn");
 
     if (state.isRunning) {
       startBtn.style.display = "none";
-      stopBtn.style.display = "block";
       pauseBtn.style.display = "block";
-      pauseBtn.textContent = state.isPaused ? "Resume" : "Pause";
+      pauseBtn.textContent = state.isPaused ? "▶️ Resume" : "⏸️ Pause";
     } else {
       startBtn.style.display = "block";
-      stopBtn.style.display = "none";
       pauseBtn.style.display = "none";
     }
   }
