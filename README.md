@@ -1,4 +1,4 @@
-# Fabinator - Fab Auto-Licensing Script
+# Fabinator - Fab.com Auto-Licensing Script
 
 ## Overview
 
