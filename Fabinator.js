@@ -2,143 +2,156 @@
 // Quixel Megascans Auto-Licensing Script
 // ==================================
 
-(function() {
-    'use strict';
+(function () {
+  "use strict";
 
-    // Configuration and State
-    const config = {
-        itemSelector: '.fabkit-Stack-root.nTa5u2sc',
-        freeTextIndicator: 'Free',
-        cartButtonSelector: '.fabkit-Button-root[aria-label*="cart"]',
-        modalCloseButtonSelector: '.fabkit-XButton-root.fabkit-Modal-closeButton',
-        professionalRadioId: ':r1l:',
-        personalRadioId: ':r1i:',
-        confirmButtonSelector: '.fabkit-Button-root.fabkit-Button--primary',
-        priceTextClass: 'fabkit-Typography-root.fabkit-Typography--align-start.fabkit-Typography--intent-primary.fabkit-Text--lg.fabkit-Text--bold',
-        modalStackSelector: '.fabkit-Stack-root.nTa5u2sc',
-        highlightColor: '#00d9ff',
-        guiBackgroundColor: '#0a1929',
-        guiAccentColor: '#00d9ff',
-        processingDelay: 1500,
-        modalOpenDelay: 800,
-        scrollDelay: 300
-    };
+  // Configuration and State
+  const config = {
+    itemSelector: ".fabkit-Stack-root.nTa5u2sc",
+    freeTextIndicator: "Free",
+    cartButtonSelector: '.fabkit-Button-root[aria-label*="cart"]',
+    modalCloseButtonSelector: ".fabkit-XButton-root.fabkit-Modal-closeButton",
+    professionalRadioId: ":r1l:",
+    personalRadioId: ":r1i:",
+    confirmButtonSelector: ".fabkit-Button-root.fabkit-Button--primary",
+    priceTextClass:
+      "fabkit-Typography-root.fabkit-Typography--align-start.fabkit-Typography--intent-primary.fabkit-Text--lg.fabkit-Text--bold",
+    modalStackSelector: ".fabkit-Stack-root.nTa5u2sc",
+    highlightColor: "#d542b2",
+    guiBackgroundColor: "#220a29",
+    guiAccentColor: "#af3d7e",
+    processingDelay: 500,
+    modalOpenDelay: 800,
+    scrollDelay: 300,
+  };
 
-    const state = {
-        isRunning: false,
-        isPaused: false,
-        processedItems: new Set(),
-        counters: {
-            professional: 0,
-            personal: 0,
-            skipped: 0,
-            total: 0
-        },
-        currentItemIndex: 0,
-        personalLicenseAlternatively: false
-    };
+  const state = {
+    isRunning: false,
+    isPaused: false,
+    processedItems: new Set(),
+    counters: {
+      professional: 0,
+      personal: 0,
+      skipped: 0,
+      total: 0,
+    },
+    currentItemIndex: 0,
+    personalLicenseAlternatively: false,
+  };
 
-    // ===================
-    // Utility Functions
-    // ===================
+  // ===================
+  // Utility Functions
+  // ===================
 
-    function log(message, type = 'info') {
-        const timestamp = new Date().toLocaleTimeString();
-        const prefix = `[${timestamp}]`;
-        const logEntry = { message, type, timestamp };
-        
-        if (type === 'error') {
-            console.error(prefix, message);
-        } else if (type === 'warn') {
-            console.warn(prefix, message);
-        } else {
-            console.log(prefix, message);
+  function log(message, type = "info") {
+    const timestamp = new Date().toLocaleTimeString();
+    const prefix = `[${timestamp}]`;
+    const logEntry = { message, type, timestamp };
+
+    if (type === "error") {
+      console.error(prefix, message);
+    } else if (type === "warn") {
+      console.warn(prefix, message);
+    } else {
+      console.log(prefix, message);
+    }
+
+    updateLogDisplay(logEntry);
+  }
+
+  function waitFor(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function waitForElement(selector, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(selector)) {
+        return resolve(document.querySelector(selector));
+      }
+
+      const observer = new MutationObserver(() => {
+        if (document.querySelector(selector)) {
+          observer.disconnect();
+          resolve(document.querySelector(selector));
         }
-        
-        updateLogDisplay(logEntry);
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+
+      setTimeout(() => {
+        observer.disconnect();
+        reject(new Error(`Element ${selector} not found within ${timeout}ms`));
+      }, timeout);
+    });
+  }
+
+  function simulateClick(element) {
+    if (!element) return false;
+
+    const events = [
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      }),
+      new MouseEvent("mouseup", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      }),
+      new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        view: window,
+      }),
+    ];
+
+    events.forEach((event) => element.dispatchEvent(event));
+    return true;
+  }
+
+  function triggerPressEvent(element) {
+    if (!element) return false;
+
+    // Try clicking the radio button directly
+    if (element.tagName === "INPUT" && element.type === "radio") {
+      element.checked = true;
+      element.dispatchEvent(new Event("change", { bubbles: true }));
+      element.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
-    function waitFor(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    simulateClick(element);
+    return true;
+  }
+
+  // ===================
+  // Item Processing
+  // ===================
+
+  function highlightItem(item, active = true) {
+    if (active) {
+      item.style.outline = `3px solid ${config.highlightColor}`;
+      item.style.outlineOffset = "4px";
+      item.style.boxShadow = `0 0 20px ${config.highlightColor}80, inset 0 0 20px ${config.highlightColor}30`;
+      item.style.transition = "all 0.3s ease-in-out";
+      item.style.position = "relative";
+      item.style.zIndex = "1000";
+
+      // Scroll into view
+      item.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      item.style.outline = "";
+      item.style.outlineOffset = "";
+      item.style.boxShadow = "";
+      item.style.zIndex = "";
     }
+  }
 
-    function waitForElement(selector, timeout = 5000) {
-        return new Promise((resolve, reject) => {
-            if (document.querySelector(selector)) {
-                return resolve(document.querySelector(selector));
-            }
-
-            const observer = new MutationObserver(() => {
-                if (document.querySelector(selector)) {
-                    observer.disconnect();
-                    resolve(document.querySelector(selector));
-                }
-            });
-
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-
-            setTimeout(() => {
-                observer.disconnect();
-                reject(new Error(`Element ${selector} not found within ${timeout}ms`));
-            }, timeout);
-        });
-    }
-
-    function simulateClick(element) {
-        if (!element) return false;
-        
-        const events = [
-            new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }),
-            new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }),
-            new MouseEvent('click', { bubbles: true, cancelable: true, view: window })
-        ];
-        
-        events.forEach(event => element.dispatchEvent(event));
-        return true;
-    }
-
-    function triggerPressEvent(element) {
-        if (!element) return false;
-        
-        // Try clicking the radio button directly
-        if (element.tagName === 'INPUT' && element.type === 'radio') {
-            element.checked = true;
-            element.dispatchEvent(new Event('change', { bubbles: true }));
-            element.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        
-        simulateClick(element);
-        return true;
-    }
-
-    // ===================
-    // Item Processing
-    // ===================
-
-    function highlightItem(item, active = true) {
-        if (active) {
-            item.style.outline = `3px solid ${config.highlightColor}`;
-            item.style.outlineOffset = '4px';
-            item.style.boxShadow = `0 0 20px ${config.highlightColor}80, inset 0 0 20px ${config.highlightColor}30`;
-            item.style.transition = 'all 0.3s ease-in-out';
-            item.style.position = 'relative';
-            item.style.zIndex = '1000';
-            
-            // Scroll into view
-            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else {
-            item.style.outline = '';
-            item.style.outlineOffset = '';
-            item.style.boxShadow = '';
-            item.style.zIndex = '';
-        }
-    }
-
-    function checkIfItemIsFree(item) {
-            try {
+  function checkIfItemIsFree(item) {
+    try {
       log("Checking if item is free...", "info");
 
       // Look for the price section that contains "From" and "Free" as siblings
@@ -201,338 +214,383 @@
       log(`Error checking if item is free: ${error.message}`, "error");
       return false;
     }
-    }
+  }
 
-    function findShoppingCartButton(item) {
-        try {
-            const buttons = item.querySelectorAll('button[aria-label*="cart"], button[aria-label*="Cart"]');
-            for (let button of buttons) {
-                const icon = button.querySelector('.edsicon-shopping-cart-plus');
-                if (icon) {
-                    return button;
-                }
-            }
-            return null;
-        } catch (error) {
-            log(`Error finding shopping cart button: ${error.message}`, 'error');
-            return null;
+  function findShoppingCartButton(item) {
+    try {
+      const buttons = item.querySelectorAll(
+        'button[aria-label*="cart"], button[aria-label*="Cart"]',
+      );
+      for (let button of buttons) {
+        const icon = button.querySelector(".edsicon-shopping-cart-plus");
+        if (icon) {
+          return button;
         }
+      }
+      return null;
+    } catch (error) {
+      log(`Error finding shopping cart button: ${error.message}`, "error");
+      return null;
     }
+  }
 
-    async function processModalLicenseSelection() {
-        try {
-        log("Waiting for license modal to open...", "info");
-        await waitForElement(".fabkit-Modal-root", 3000);
-        log("Modal appeared", "success");
+  async function processModalLicenseSelection() {
+    try {
+      log("Waiting for license modal to open...", "info");
+      await waitForElement(".fabkit-Modal-root", 3000);
+      log("Modal appeared", "success");
 
-        const modal = document.querySelector(".fabkit-Modal-root");
+      // Wait for modal elements to be fully loaded
+      log("Waiting for radio buttons and close button to load...", "info");
+      await Promise.all([
+        waitForElement(`#${config.professionalRadioId}`, 5000).catch(() => null),
+        waitForElement(`#${config.personalRadioId}`, 5000).catch(() => null),
+        waitForElement(config.modalCloseButtonSelector, 5000).catch(() => null),
+      ]);
+      
+      // Additional delay to ensure elements are interactive
+      await waitFor(500);
+      log("Modal elements fully loaded", "success");
 
-        if (!modal) {
-            log("Modal not found!", "error");
-            return false;
-        }
+      const modal = document.querySelector(".fabkit-Modal-root");
 
-        const formFields = modal.querySelectorAll(".fabkit-FormField-root");
+      if (!modal) {
+        log("Modal not found!", "error");
+        return false;
+      }
 
-        /*if (formFields.length < 2) {
+      const formFields = modal.querySelectorAll(".fabkit-FormField-root");
+
+      /*if (formFields.length < 2) {
             log("License options not found", "error");
             await closeModalIfOpen();
             return false;
             }*/
 
-        let professionalSection = null;
-        let personalSection = null;
+      let professionalSection = null;
+      let personalSection = null;
 
-        formFields.forEach((field) => {
-            const label = field.querySelector("label");
-            if (label && label.textContent.trim() === "Professional") {
-            professionalSection = field;
-            } else if (label && label.textContent.trim() === "Personal") {
-            personalSection = field;
-            }
-        });
-
-        if (!professionalSection || !personalSection) {
-            log("Professional or Personal section not found", "error");
-            await closeModalIfOpen();
-            return false;
+      formFields.forEach((field) => {
+        const label = field.querySelector("label");
+        if (label && label.textContent.trim() === "Professional") {
+          professionalSection = field;
+        } else if (label && label.textContent.trim() === "Personal") {
+          personalSection = field;
         }
+      });
 
-        // Check Professional License
-        const professionalPriceElements = professionalSection.querySelectorAll(
-            `.${config.priceTextClass.split(" ").join(".")}`,
-        );
-
-        const professionalIsFree = Array.from(professionalPriceElements).some(
-            (el) => el.textContent.trim().toLowerCase() === "free",
-        );
-
-        // Check Personal License
-        const personalPriceElements = personalSection.querySelectorAll(
-            `.${config.priceTextClass.split(" ").join(".")}`,
-        );
-
-        const personalIsFree = Array.from(personalPriceElements).some(
-            (el) => el.textContent.trim().toLowerCase() === "free",
-        );
-
-        log(
-            `Professional: ${professionalIsFree ? "FREE" : "paid"}`,
-            professionalIsFree ? "success" : "warning",
-        );
-        log(
-            `Personal: ${personalIsFree ? "FREE" : "paid"}`,
-            personalIsFree ? "success" : "warning",
-        );
-
-        // Decision Logic (from working script)
-        if (professionalIsFree) {
-            log("Selecting Professional license", "info");
-            const professionalRadio = professionalSection.querySelector(
-            'input[type="radio"]',
-            );
-            if (professionalRadio) {
-            professionalRadio.click();
-            await waitFor(300);
-
-            const addButton = modal.querySelector(config.confirmButtonSelector);
-            if (addButton && !addButton.disabled) {
-                addButton.click();
-                log("Added to library (Professional)", "success");
-                state.counters.professional++;
-                updateCounters();
-                await waitFor(1000);
-                return true;
-            }
-            }
-            log("Error adding to library", "error");
-            await closeModalIfOpen();
-            return false;
-        } else if (!professionalIsFree && !state.personalLicenseAlternatively) {
-            log("Professional not free and no alternative desired", "warning");
-            await closeModalIfOpen();
-            return false;
-        } else if (personalIsFree) {
-            log("Selecting Personal license as alternative", "info");
-            const personalRadio = personalSection.querySelector(
-            'input[type="radio"]',
-            );
-            if (personalRadio) {
-            personalRadio.click();
-            await waitFor(300);
-
-            const addButton = modal.querySelector(config.confirmButtonSelector);
-            if (addButton && !addButton.disabled) {
-                addButton.click();
-                log("Added to library (Personal)", "success");
-                state.counters.personal++;
-                updateCounters();
-                await waitFor(1000);
-                return true;
-            }
-            }
-            log("Error adding to library", "error");
-            await closeModalIfOpen();
-            return false;
-        } else {
-            log("No free license available", "warning");
-            await closeModalIfOpen();
-            return false;
-        }
-        } catch (error) {
-        log(`Error processing modal: ${error.message}`, "error");
+      if (!professionalSection || !personalSection) {
+        log("Professional or Personal section not found", "error");
         await closeModalIfOpen();
         return false;
-        }
-    }
+      }
 
-    async function closeModalIfOpen() {
-        const closeButton = document.querySelector(config.modalCloseButtonSelector);
-        if (closeButton) {
-        log("Closing modal...", "info");
+      // Check Professional License
+      const professionalPriceElements = professionalSection.querySelectorAll(
+        `.${config.priceTextClass.split(" ").join(".")}`,
+      );
+
+      const professionalIsFree = Array.from(professionalPriceElements).some(
+        (el) => el.textContent.trim().toLowerCase() === "free",
+      );
+
+      // Check Personal License
+      const personalPriceElements = personalSection.querySelectorAll(
+        `.${config.priceTextClass.split(" ").join(".")}`,
+      );
+
+      const personalIsFree = Array.from(personalPriceElements).some(
+        (el) => el.textContent.trim().toLowerCase() === "free",
+      );
+
+      log(
+        `Professional: ${professionalIsFree ? "FREE" : "paid"}`,
+        professionalIsFree ? "success" : "warning",
+      );
+      log(
+        `Personal: ${personalIsFree ? "FREE" : "paid"}`,
+        personalIsFree ? "success" : "warning",
+      );
+
+      // Decision Logic (from working script)
+      if (professionalIsFree) {
+        log("Selecting Professional license", "info");
+        const professionalRadio = professionalSection.querySelector(
+          'input[type="radio"]',
+        );
+        if (professionalRadio) {
+          professionalRadio.click();
+          await waitFor(300);
+
+          // Wait for confirm button to be available and enabled
+          log("Waiting for Add button to be ready...", "info");
+          const addButton = await waitForElement(config.confirmButtonSelector, 3000).catch(() => null);
+          
+          if (addButton && !addButton.disabled) {
+            addButton.click();
+            log("Added to library (Professional)", "success");
+            state.counters.professional++;
+            updateCounters();
+            await waitFor(1000);
+            return true;
+          } else {
+            log("Add button not found or disabled", "error");
+          }
+        }
+        log("Error adding to library", "error");
+        await closeModalIfOpen();
+        return false;
+      } else if (!professionalIsFree && !state.personalLicenseAlternatively) {
+        log("Professional not free and no alternative desired", "warning");
+        await closeModalIfOpen();
+        return false;
+      } else if (personalIsFree) {
+        log("Selecting Personal license as alternative", "info");
+        const personalRadio = personalSection.querySelector(
+          'input[type="radio"]',
+        );
+        if (personalRadio) {
+          personalRadio.click();
+          await waitFor(300);
+
+          // Wait for confirm button to be available and enabled
+          log("Waiting for Add button to be ready...", "info");
+          const addButton = await waitForElement(config.confirmButtonSelector, 3000).catch(() => null);
+          
+          if (addButton && !addButton.disabled) {
+            addButton.click();
+            log("Added to library (Personal)", "success");
+            state.counters.personal++;
+            updateCounters();
+            await waitFor(1000);
+            return true;
+          } else {
+            log("Add button not found or disabled", "error");
+          }
+        }
+        log("Error adding to library", "error");
+        await closeModalIfOpen();
+        return false;
+      } else {
+        log("No free license available", "warning");
+        await closeModalIfOpen();
+        return false;
+      }
+    } catch (error) {
+      log(`Error processing modal: ${error.message}`, "error");
+      await closeModalIfOpen();
+      return false;
+    }
+  }
+
+  async function closeModalIfOpen() {
+    try {
+      log("Attempting to close modal...", "info");
+      // Wait for close button to be available
+      const closeButton = await waitForElement(
+        config.modalCloseButtonSelector,
+        3000
+      ).catch(() => null);
+      
+      if (closeButton) {
+        log("Close button found, clicking...", "info");
         closeButton.click();
         await waitFor(500);
-        }
+        log("Modal closed", "success");
+      } else {
+        log("No close button found - modal may already be closed", "info");
+      }
+    } catch (error) {
+      log(`Error closing modal: ${error.message}`, "warn");
     }
+  }
 
-    async function processItem(item, index) {
-        try {
-            log(`Processing item ${index + 1}...`, 'info');
-            state.counters.total++;
-            
-            // Highlight the item
-            highlightItem(item, true);
-            await waitFor(500);
+  async function processItem(item, index) {
+    try {
+      log(`Processing item ${index + 1}...`, "info");
+      state.counters.total++;
 
-            // Check if item is free
-            if (!checkIfItemIsFree(item)) {
-                log(`Item ${index + 1} is not free - skipping`, 'warn');
-                highlightItem(item, false);
-                state.counters.skipped++;
-                updateCounters();
-                return false;
-            }
+      // Highlight the item
+      highlightItem(item, true);
+      await waitFor(200);
 
-            // Find and click shopping cart button
-            const cartButton = findShoppingCartButton(item);
-            if (!cartButton) {
-                log(`Item ${index + 1}: Shopping cart button not found - skipping`, 'error');
-                highlightItem(item, false);
-                state.counters.skipped++;
-                updateCounters();
-                return false;
-            }
-
-            log(`Item ${index + 1}: Clicking shopping cart button`, 'info');
-            simulateClick(cartButton);
-            
-            // Wait for modal to open and process license selection
-            await waitFor(config.modalOpenDelay);
-            const success = await processModalLicenseSelection();
-
-            // Remove highlight
-            highlightItem(item, false);
-            await waitFor(config.processingDelay);
-
-            if (!success) {
-                state.counters.skipped++;
-                updateCounters();
-            }
-
-            return success;
-
-        } catch (error) {
-            log(`Error processing item ${index + 1}: ${error.message}`, 'error');
-            highlightItem(item, false);
-            state.counters.skipped++;
-            updateCounters();
-            return false;
-        }
-    }
-
-    // ===================
-    // Main Processing Loop
-    // ===================
-
-    async function processAllItems() {
-        if (state.isRunning) {
-            log('Processing already running', 'warn');
-            return;
-        }
-
-        state.isRunning = true;
-        state.isPaused = false;
-        log('Starting automated licensing process...', 'info');
-        updateStartButton();
-
-        try {
-            while (state.isRunning) {
-                // Get all items
-                const items = document.querySelectorAll(config.itemSelector);
-                
-                if (items.length === 0) {
-                    log('No items found on page', 'warn');
-                    break;
-                }
-
-                log(`Found ${items.length} items on page`, 'info');
-
-                // Process items that haven't been processed yet
-                let processedThisRound = 0;
-                for (let i = state.currentItemIndex; i < items.length && state.isRunning; i++) {
-                    const item = items[i];
-                    const itemId = `item-${i}`;
-                    
-                    if (!state.processedItems.has(itemId)) {
-                        await processItem(item, i);
-                        state.processedItems.add(itemId);
-                        state.currentItemIndex = i + 1;
-                        processedThisRound++;
-                    }
-
-                    // Check for pause
-                    while (state.isPaused && state.isRunning) {
-                        await waitFor(500);
-                    }
-                }
-
-                // Check if there are more items to load (infinite scroll)
-                log('Checking for additional items...', 'info');
-                await waitFor(config.scrollDelay);
-                
-                // Scroll to bottom to trigger loading more items
-                window.scrollTo(0, document.body.scrollHeight);
-                await waitFor(1000);
-
-                const newItems = document.querySelectorAll(config.itemSelector);
-                if (newItems.length === items.length) {
-                    log('No new items loaded - processing complete', 'info');
-                    break;
-                }
-
-                log(`New items detected (${newItems.length} total), continuing...`, 'info');
-            }
-
-        } catch (error) {
-            log(`Fatal error in processing loop: ${error.message}`, 'error');
-        } finally {
-            state.isRunning = false;
-            log('Processing stopped', 'info');
-            updateStartButton();
-        }
-    }
-
-    function stopProcessing() {
-        if (state.isRunning) {
-            log('Stopping process...', 'info');
-            state.isRunning = false;
-            state.isPaused = false;
-            updateStartButton();
-        }
-    }
-
-    function togglePause() {
-        if (state.isRunning) {
-            state.isPaused = !state.isPaused;
-            log(state.isPaused ? 'Process paused' : 'Process resumed', 'info');
-            updateStartButton();
-        }
-    }
-
-    function resetCounters() {
-        state.counters = {
-            professional: 0,
-            personal: 0,
-            skipped: 0,
-            total: 0
-        };
-        state.currentItemIndex = 0;
-        state.processedItems.clear();
+      // Check if item is free
+      if (!checkIfItemIsFree(item)) {
+        log(`Item ${index + 1} is not free - skipping`, "warn");
+        highlightItem(item, false);
+        state.counters.skipped++;
         updateCounters();
-        clearLogs();
-        log('Counters reset', 'info');
+        return false;
+      }
+
+      // Find and click shopping cart button
+      const cartButton = findShoppingCartButton(item);
+      if (!cartButton) {
+        log(
+          `Item ${index + 1}: Shopping cart button not found - skipping`,
+          "error",
+        );
+        highlightItem(item, false);
+        state.counters.skipped++;
+        updateCounters();
+        return false;
+      }
+
+      log(`Item ${index + 1}: Clicking shopping cart button`, "info");
+      simulateClick(cartButton);
+
+      // Wait for modal to open and process license selection
+      await waitFor(config.modalOpenDelay);
+      const success = await processModalLicenseSelection();
+
+      // Remove highlight
+      highlightItem(item, false);
+      await waitFor(config.processingDelay);
+
+      if (!success) {
+        state.counters.skipped++;
+        updateCounters();
+      }
+
+      return success;
+    } catch (error) {
+      log(`Error processing item ${index + 1}: ${error.message}`, "error");
+      highlightItem(item, false);
+      state.counters.skipped++;
+      updateCounters();
+      return false;
+    }
+  }
+
+  // ===================
+  // Main Processing Loop
+  // ===================
+
+  async function processAllItems() {
+    if (state.isRunning) {
+      log("Processing already running", "warn");
+      return;
     }
 
-    // ===================
-    // GUI Creation
-    // ===================
+    state.isRunning = true;
+    state.isPaused = false;
+    log("Starting automated licensing process...", "info");
+    updateStartButton();
 
-    function createGUI() {
-        // Remove existing GUI if any
-        const existingGUI = document.getElementById('quixel-auto-license-gui');
-        if (existingGUI) {
-            existingGUI.remove();
+    try {
+      while (state.isRunning) {
+        // Get all items
+        const items = document.querySelectorAll(config.itemSelector);
+
+        if (items.length === 0) {
+          log("No items found on page", "warn");
+          break;
         }
 
-        // Create minimized toggle button
-        const toggleButton = document.createElement('div');
-        toggleButton.id = 'quixel-auto-license-toggle';
-        toggleButton.innerHTML = `
+        log(`Found ${items.length} items on page`, "info");
+
+        // Process items that haven't been processed yet
+        let processedThisRound = 0;
+        for (
+          let i = state.currentItemIndex;
+          i < items.length && state.isRunning;
+          i++
+        ) {
+          const item = items[i];
+          const itemId = `item-${i}`;
+
+          if (!state.processedItems.has(itemId)) {
+            await processItem(item, i);
+            state.processedItems.add(itemId);
+            state.currentItemIndex = i + 1;
+            processedThisRound++;
+          }
+
+          // Check for pause
+          while (state.isPaused && state.isRunning) {
+            await waitFor(500);
+          }
+        }
+
+        // Check if there are more items to load (infinite scroll)
+        log("Checking for additional items...", "info");
+        await waitFor(config.scrollDelay);
+
+        // Scroll to bottom to trigger loading more items
+        window.scrollTo(0, document.body.scrollHeight);
+        await waitFor(1000);
+
+        const newItems = document.querySelectorAll(config.itemSelector);
+        if (newItems.length === items.length) {
+          log("No new items loaded - processing complete", "info");
+          break;
+        }
+
+        log(
+          `New items detected (${newItems.length} total), continuing...`,
+          "info",
+        );
+      }
+    } catch (error) {
+      log(`Fatal error in processing loop: ${error.message}`, "error");
+    } finally {
+      state.isRunning = false;
+      log("Processing stopped", "info");
+      updateStartButton();
+    }
+  }
+
+  function stopProcessing() {
+    if (state.isRunning) {
+      log("Stopping process...", "info");
+      state.isRunning = false;
+      state.isPaused = false;
+      updateStartButton();
+    }
+  }
+
+  function togglePause() {
+    if (state.isRunning) {
+      state.isPaused = !state.isPaused;
+      log(state.isPaused ? "Process paused" : "Process resumed", "info");
+      updateStartButton();
+    }
+  }
+
+  function resetCounters() {
+    state.counters = {
+      professional: 0,
+      personal: 0,
+      skipped: 0,
+      total: 0,
+    };
+    state.currentItemIndex = 0;
+    state.processedItems.clear();
+    updateCounters();
+    clearLogs();
+    log("Counters reset", "info");
+  }
+
+  // ===================
+  // GUI Creation
+  // ===================
+
+  function createGUI() {
+    // Remove existing GUI if any
+    const existingGUI = document.getElementById("quixel-auto-license-gui");
+    if (existingGUI) {
+      existingGUI.remove();
+    }
+
+    // Create minimized toggle button
+    const toggleButton = document.createElement("div");
+    toggleButton.id = "quixel-auto-license-toggle";
+    toggleButton.innerHTML = `
             <svg width="33" height="33" viewBox="0 0 24 24" fill="white">
                 <path d="M7 10l5 5 5-5z"/>
             </svg>
         `;
-        toggleButton.style.cssText = `
+    toggleButton.style.cssText = `
             position: fixed;
             top: 0;
             right: 300px;
@@ -549,13 +607,13 @@
             justify-content: center;
             z-index: 10000;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0, 217, 255, 0.3);
+            box-shadow: 0 4px 12px rgba(255, 0, 128, 0.3);
         `;
 
-        // Create main GUI container
-        const gui = document.createElement('div');
-        gui.id = 'quixel-auto-license-gui';
-        gui.style.cssText = `
+    // Create main GUI container
+    const gui = document.createElement("div");
+    gui.id = "quixel-auto-license-gui";
+    gui.style.cssText = `
             position: fixed;
             top: -600px;
             right: 20px;
@@ -566,11 +624,11 @@
             padding: 20px;
             z-index: 10001;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            box-shadow: 0 8px 32px rgba(0, 217, 255, 0.4);
+            box-shadow: 0 8px 32px rgba(241, 43, 115, 0.4);
             transition: top 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         `;
 
-        gui.innerHTML = `
+    gui.innerHTML = `
             <style>
                 #quixel-auto-license-gui * {
                     box-sizing: border-box;
@@ -600,9 +658,9 @@
                     align-items: center;
                     margin-bottom: 15px;
                     padding: 12px;
-                    background: rgba(0, 217, 255, 0.1);
+                    background: rgba(114, 25, 89, 0.1);
                     border-radius: 6px;
-                    border: 1px solid rgba(0, 217, 255, 0.3);
+                    border: 1px solid rgba(137, 23, 69, 0.3);
                 }
                 .qal-checkbox {
                     width: 20px;
@@ -623,10 +681,10 @@
                     margin-bottom: 20px;
                 }
                 .qal-counter {
-                    background: rgba(0, 217, 255, 0.15);
+                    background: rgba(255, 0, 140, 0.15);
                     padding: 12px;
                     border-radius: 6px;
-                    border: 1px solid rgba(0, 217, 255, 0.3);
+                    border: 1px solid rgba(255, 0, 106, 0.3);
                 }
                 .qal-counter-label {
                     color: #aaa;
@@ -660,9 +718,9 @@
                     letter-spacing: 0.5px;
                 }
                 .qal-button:hover {
-                    background: #00b8d4;
+                    background: #b92d7c;
                     transform: translateY(-2px);
-                    box-shadow: 0 4px 12px rgba(0, 217, 255, 0.4);
+                    box-shadow: 0 4px 12px rgba(109, 25, 41, 0.4);
                 }
                 .qal-button:active {
                     transform: translateY(0);
@@ -737,9 +795,9 @@
                     transform: scale(1.2);
                 }
             </style>
-            
+
             <h1 class="qal-title">Licensing Items</h1>
-            
+
             <div class="qal-section">
                 <div class="qal-checkbox-container">
                     <input type="checkbox" id="qal-personal-alternative" class="qal-checkbox">
@@ -748,7 +806,7 @@
                     </label>
                 </div>
             </div>
-            
+
             <div class="qal-section">
                 <div class="qal-section-title">Statistics</div>
                 <div class="qal-counters">
@@ -770,7 +828,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="qal-section">
                 <div class="qal-buttons">
                     <button class="qal-button" id="qal-start-btn">Start</button>
@@ -779,99 +837,117 @@
                     <button class="qal-button reset" id="qal-reset-btn">Reset</button>
                 </div>
             </div>
-            
+
             <div class="qal-section">
                 <div class="qal-section-title">Activity Log</div>
                 <div class="qal-logs" id="qal-logs"></div>
             </div>
         `;
 
-        document.body.appendChild(toggleButton);
-        document.body.appendChild(gui);
+    document.body.appendChild(toggleButton);
+    document.body.appendChild(gui);
 
-        // Event Listeners
-        toggleButton.addEventListener('click', () => {
-            const isVisible = gui.style.top === '30px';
-            gui.style.top = isVisible ? '-700px' : '30px';
-            toggleButton.querySelector('svg').style.transform = isVisible ? 'rotate(0deg)' : 'rotate(180deg)';
-        });
+    // Event Listeners
+    toggleButton.addEventListener("click", () => {
+      const isVisible = gui.style.top === "30px";
+      gui.style.top = isVisible ? "-700px" : "30px";
+      toggleButton.querySelector("svg").style.transform = isVisible
+        ? "rotate(0deg)"
+        : "rotate(180deg)";
+    });
 
-        document.getElementById('qal-personal-alternative').addEventListener('change', (e) => {
-            state.personalLicenseAlternatively = e.target.checked;
-            log(`Personal license alternative: ${e.target.checked ? 'Enabled' : 'Disabled'}`, 'info');
-        });
+    document
+      .getElementById("qal-personal-alternative")
+      .addEventListener("change", (e) => {
+        state.personalLicenseAlternatively = e.target.checked;
+        log(
+          `Personal license alternative: ${e.target.checked ? "Enabled" : "Disabled"}`,
+          "info",
+        );
+      });
 
-        document.getElementById('qal-start-btn').addEventListener('click', processAllItems);
-        document.getElementById('qal-stop-btn').addEventListener('click', stopProcessing);
-        document.getElementById('qal-pause-btn').addEventListener('click', togglePause);
-        document.getElementById('qal-reset-btn').addEventListener('click', resetCounters);
+    document
+      .getElementById("qal-start-btn")
+      .addEventListener("click", processAllItems);
+    document
+      .getElementById("qal-stop-btn")
+      .addEventListener("click", stopProcessing);
+    document
+      .getElementById("qal-pause-btn")
+      .addEventListener("click", togglePause);
+    document
+      .getElementById("qal-reset-btn")
+      .addEventListener("click", resetCounters);
 
-        log('GUI initialized successfully', 'info');
-    }
+    log("GUI initialized successfully", "info");
+  }
 
-    function updateCounters() {
-        document.getElementById('qal-counter-professional').textContent = state.counters.professional;
-        document.getElementById('qal-counter-personal').textContent = state.counters.personal;
-        document.getElementById('qal-counter-skipped').textContent = state.counters.skipped;
-        document.getElementById('qal-counter-total').textContent = state.counters.total;
-    }
+  function updateCounters() {
+    document.getElementById("qal-counter-professional").textContent =
+      state.counters.professional;
+    document.getElementById("qal-counter-personal").textContent =
+      state.counters.personal;
+    document.getElementById("qal-counter-skipped").textContent =
+      state.counters.skipped;
+    document.getElementById("qal-counter-total").textContent =
+      state.counters.total;
+  }
 
-    function updateStartButton() {
-        const startBtn = document.getElementById('qal-start-btn');
-        const stopBtn = document.getElementById('qal-stop-btn');
-        const pauseBtn = document.getElementById('qal-pause-btn');
+  function updateStartButton() {
+    const startBtn = document.getElementById("qal-start-btn");
+    const stopBtn = document.getElementById("qal-stop-btn");
+    const pauseBtn = document.getElementById("qal-pause-btn");
 
-        if (state.isRunning) {
-            startBtn.style.display = 'none';
-            stopBtn.style.display = 'block';
-            pauseBtn.style.display = 'block';
-            pauseBtn.textContent = state.isPaused ? 'Resume' : 'Pause';
-        } else {
-            startBtn.style.display = 'block';
-            stopBtn.style.display = 'none';
-            pauseBtn.style.display = 'none';
-        }
-    }
-
-    function updateLogDisplay(logEntry) {
-        const logsContainer = document.getElementById('qal-logs');
-        if (!logsContainer) return;
-
-        const logElement = document.createElement('div');
-        logElement.className = `qal-log-entry ${logEntry.type}`;
-        logElement.textContent = `[${logEntry.timestamp}] ${logEntry.message}`;
-        
-        logsContainer.appendChild(logElement);
-        logsContainer.scrollTop = logsContainer.scrollHeight;
-
-        // Keep only last 100 log entries
-        while (logsContainer.children.length > 100) {
-            logsContainer.removeChild(logsContainer.firstChild);
-        }
-    }
-
-    function clearLogs() {
-        const logsContainer = document.getElementById('qal-logs');
-        if (logsContainer) {
-            logsContainer.innerHTML = '';
-        }
-    }
-
-    // ===================
-    // Initialization
-    // ===================
-
-    function initialize() {
-        log('Initializing Quixel Auto-Licensing Script...', 'info');
-        createGUI();
-        log('Script ready. Click the toggle button or Start to begin.', 'info');
-    }
-
-    // Wait for page to be fully loaded
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initialize);
+    if (state.isRunning) {
+      startBtn.style.display = "none";
+      stopBtn.style.display = "block";
+      pauseBtn.style.display = "block";
+      pauseBtn.textContent = state.isPaused ? "Resume" : "Pause";
     } else {
-        initialize();
+      startBtn.style.display = "block";
+      stopBtn.style.display = "none";
+      pauseBtn.style.display = "none";
     }
+  }
 
+  function updateLogDisplay(logEntry) {
+    const logsContainer = document.getElementById("qal-logs");
+    if (!logsContainer) return;
+
+    const logElement = document.createElement("div");
+    logElement.className = `qal-log-entry ${logEntry.type}`;
+    logElement.textContent = `[${logEntry.timestamp}] ${logEntry.message}`;
+
+    logsContainer.appendChild(logElement);
+    logsContainer.scrollTop = logsContainer.scrollHeight;
+
+    // Keep only last 100 log entries
+    while (logsContainer.children.length > 100) {
+      logsContainer.removeChild(logsContainer.firstChild);
+    }
+  }
+
+  function clearLogs() {
+    const logsContainer = document.getElementById("qal-logs");
+    if (logsContainer) {
+      logsContainer.innerHTML = "";
+    }
+  }
+
+  // ===================
+  // Initialization
+  // ===================
+
+  function initialize() {
+    log("Initializing Quixel Auto-Licensing Script...", "info");
+    createGUI();
+    log("Script ready. Click the toggle button or Start to begin.", "info");
+  }
+
+  // Wait for page to be fully loaded
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initialize);
+  } else {
+    initialize();
+  }
 })();
