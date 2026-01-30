@@ -17,7 +17,7 @@
     priceTextClass:
       "fabkit-Typography-root.fabkit-Typography--align-start.fabkit-Typography--intent-primary.fabkit-Text--lg.fabkit-Text--bold",
     modalStackSelector: ".fabkit-Stack-root.nTa5u2sc",
-    highlightColor: "#764ba2",
+    highlightColor: "#5b56aa",
     guiBackgroundColor: "#667eea",
     guiAccentColor: "#764ba2",
     processingDelay: 1500,
@@ -136,7 +136,6 @@
       item.style.outline = `3px solid ${config.highlightColor}`;
       item.style.outlineOffset = "4px";
       item.style.boxShadow = `0 0 20px ${config.highlightColor}80, inset 0 0 20px ${config.highlightColor}30`;
-      item.style.transition = "all 0.3s ease-in-out";
       item.style.position = "relative";
       item.style.zIndex = "1000";
 
@@ -382,7 +381,7 @@
 
       // Highlight the item
       highlightItem(item, true);
-      await waitFor(500);
+      await waitFor(100);
 
       // Check if item is free
       if (!checkIfItemIsFree(item)) {
